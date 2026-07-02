@@ -10,9 +10,9 @@ String.concat "" [ssub s 0 1; space1 (suf s 1)] ;;
 
 let rec spaceremove s = if s = "" then s else if s.[0] = ' ' then spaceremove (suf s 1) else String.concat "" [ssub s 0 1; spaceremove (suf s 1)];;
 
-let rec rectify s = if String.length s < 2 then s else if List.mem s.[0] ['(';')';'.';'>';'/';']'; '['; ':'; '='; 'E'; 'I'; '&'; ','] && not (s.[1]=' ') then
+let rec rectify s = if String.length s < 2 then s else if List.mem s.[0] ['(';')';'.';'>';']'; '['; ':'; '='; 'E'; 'I'; '&'; ','; 'V'] && not (s.[1]=' ') then
 String.concat "" [ssub s 0 1;" ";rectify (suf s 1)] else
-if not (s.[0] = ' ') && List.mem s.[1] ['(';')';'.';'-'; ']';  '['; ':'; '='; 'E'; 'I'; '&';','; '\\' ] then String.concat "" [ssub s 0 1;" "; rectify(suf s 1)]  else
+if not (s.[0] = ' ') && List.mem s.[1] ['(';')';'.';'-'; ']';  '['; ':'; '='; 'E'; 'I'; '&';','; 'V'  ] then String.concat "" [ssub s 0 1;" "; rectify(suf s 1)]  else
  String.concat "" [ssub s 0 1;rectify (suf s 1)];;
 
 let rec remove list elem = match list with
@@ -77,6 +77,12 @@ let varEquals (x,y) = match (x,y) with
  (Variable (a,b,_,_), Variable (c,d,_,_)) -> a = c && sortEquals(b,d)
 | _ -> false;;
 
+let conEquals (x,y) = match (x,y) with
+ (Constant (a,b,_), Constant (c,d,_)) -> a = c && sortEquals(b,d)
+| _ -> false;;
+
+
+
 let rec varMember x l = match l with
  v::w -> if varEquals (x,v) then true else varMember x w
 |_-> false;;
@@ -111,6 +117,8 @@ and  setFreeForm (f,l) = match f with
   | Binder (n,t,f,q) -> Binder (n,t, setFreeForm (f, t::l),q)
   | PropConstant (n,p)-> PropConstant (n,p);;
 
+let setFreeTerm_wrap t = setFreeTerm(t,[]);;
+let setFreeForm_wrap f = setFreeForm(f,[]);;
 
 
 let rec simpleSubTerm (t,s,x) = match t with 
@@ -172,10 +180,6 @@ and setPosForm s n = match s with
  (Binder(m, fst aux, fst aux2, snd aux2), snd aux2 + 1)
  |PropConstant (m,p) -> (PropConstant (m,n), n+1) ;;
 
-
-
-(* type proof = Proof of formula list;;
-let prop1 pr p q = (Imp (p, Imp( q,  p,0), 0 ))::pr ;; *)
      
 let vars = ref [];;
 let constants = ref[];;
@@ -294,7 +298,7 @@ let equiv parser l = let v = parenthesis_wrap (binary_op_wrap parser parser ["="
                     |_ -> None) 
  |_ -> None;;
 
-let binaryop parser l = let v = parenthesis_wrap (binary_op_wrap parser parser ["&"; "->";"\\/"]) l in match v with
+let binaryop parser l = let v = parenthesis_wrap (binary_op_wrap parser parser ["&"; "->";"V";"equiv"]) l in match v with
   Some (a,b,c) -> (match (a,c) with
                     (Some x, Some z) -> Some (BinaryOp (b,x,z,0))
                     |_ -> None) 
@@ -364,9 +368,9 @@ and printFormula f = match f with
   | Equiv (a,b,p) -> String.concat "" ["("; printTerm a; " = " ; printTerm b; ")"]
   | App (a,c,p) -> let f q = printTerm q in let aux =  (String.concat "," (List.map f c) ) in 
 String.concat "" [printTerm a; "("; aux ; ")"]  
-  | BinaryOp (n,a,b,p) -> String.concat "" ["("; printFormula a; n  ; printFormula b; ")"]
+  | BinaryOp (n,a,b,p) -> String.concat "" ["("; printFormula a; " ";n;" ";   printFormula b; ")"]
   | UnaryOp (n,a,p) -> String.concat "" [n; "("; printFormula a; ")"]
-  | Binder (n, Variable (a,w,b,q),f,p) -> String.concat "" [n ; a ;" ";  (printFormula f)]
+  | Binder (n, Variable (a,w,b,q),f,p) -> String.concat "" [n ;" "; a ;" ";  (printFormula f)]
   |PropConstant (n,p) -> n
   | _ -> "";;
 
@@ -383,7 +387,72 @@ let newVariable name s = let aux = sort (lexer s) in if not (List.mem name (getN
 |_ -> ();;
 
 let newConstant name s = let aux = sort (lexer s) in if not (List.mem name (getNames !constants))  then match aux with 
- Some f -> vars:= (Constant (name,f,0))::!constants  
+ Some f -> constants:= (Constant (name,f,0))::!constants  
 |_ -> ();;
+
+
+let displayTerm x = match x with
+                    |Some a -> printTerm a
+                    |_ -> "";;
+
+let displayFormula x = match x with
+                    |Some a -> printFormula a
+                    |_ -> "";;
+
+(*equality of formulas and terms must involve renaming bound variables *)
+
+
+let rec boolList f l1 l2 = if not(List.length l1 = List.length l2) then false else match l1 with
+ a::b -> (match l2 with
+            c::d -> (f a c) && boolList f b d
+           |_-> false)
+|[] -> (match l2 with
+            [] -> true
+           |_ -> false);;
+
+
+
+let rec termEquality t1 t2 k = match t1 with
+
+ Constant (n,s,p) -> (match t2 with 
+                        Constant (m,t,q) -> conEquals (Constant(n,s,p), Constant(m,t,q))
+                       |_ -> false)
+|Variable (n,s,f,p) -> (match t2 with
+                       Variable (m, h,o, q) -> varEquals(Variable(n,s,f,p), Variable(m,h,o,q)) 
+                       |_-> false)
+| I (v1, a, e)  -> (match t2 with
+                     I (v2,b, q) -> let aux1 = setFreeForm_wrap a in let aux2 = setFreeForm_wrap b in 
+ let aux3 = simpleSubForm (aux1, v1, (Variable(Int.to_string(k), getSort v1, false,0))) in let aux4 = simpleSubForm (aux2, v2, (Variable(Int.to_string(k), getSort v2, false,0))) in
+ formulaEquality aux3 aux4 (k+1)
+                     |_ -> false)
+and formulaEquality f1 f2 k = match f1 with
+ PropConstant (a,p) -> (match f2 with
+                     PropConstant (b,q) -> a = b
+                    |_ -> false)
+| BinaryOp (n,a,b,p) -> (match f2 with
+                        BinaryOp(m,c,d,q) -> m = n && formulaEquality a c k && formulaEquality b d k
+                       |_ -> false)
+| UnaryOp(n,a,p) -> (match f2 with
+                       UnaryOp(m,b,_) -> m = n && formulaEquality a b k
+                      |_ -> false)
+| Equiv (a,b,_) -> (match f2 with
+                       Equiv (c,d,p) -> termEquality a c k && termEquality b d k
+                      |_ -> false)
+| Binder (n,v1, a, p) -> (match f2 with
+                      Binder(m,v2,b,q) -> n = m &&  let aux1 = setFreeForm_wrap a in let aux2 = setFreeForm_wrap b in
+ let aux3 = simpleSubForm (aux1,v1,(Variable(Int.to_string(k),getSort v1, false,0))) in let aux4 = simpleSubForm (aux2,v2,(Variable(Int.to_string(k),getSort v2, false,0))) in
+ formulaEquality aux3 aux4 (k+1)
+                    |_ -> false)
+| E (t,p) -> (match f2 with 
+                     E(s,q) -> termEquality t s k
+                    |_ -> false)
+| App (t, l, p ) -> (match f2 with
+                   App (s, m, q) ->  termEquality t s k && let f x y = termEquality x y k in boolList f l m 
+                  |_ -> false)   ;;
+
+let termEquality_wrap t1 t2 = termEquality t1 t2 0;;
+let formulaEquality_wrap t1 t2 = formulaEquality t1 t2 0;;
+
+
 
 
