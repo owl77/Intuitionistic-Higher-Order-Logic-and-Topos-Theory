@@ -12,7 +12,7 @@ let rec spaceremove s = if s = "" then s else if s.[0] = ' ' then spaceremove (s
 
 let rec rectify s = if String.length s < 2 then s else if List.mem s.[0] ['(';')';'.';'>';']'; '['; ':'; '='; 'E'; 'I'; '&'; ','; 'V'] && not (s.[1]=' ') then
 String.concat "" [ssub s 0 1;" ";rectify (suf s 1)] else
-if not (s.[0] = ' ') && List.mem s.[1] ['(';')';'.';'-'; ']';  '['; ':'; '='; 'E'; 'I'; '&';','; 'V'  ] then String.concat "" [ssub s 0 1;" "; rectify(suf s 1)]  else
+if not (s.[0] = ' ') && List.mem s.[1] ['(';')';'.'; ']';  '['; ':'; '='; 'E'; 'I'; '&';','; 'V'  ] then String.concat "" [ssub s 0 1;" "; rectify(suf s 1)]  else
  String.concat "" [ssub s 0 1;rectify (suf s 1)];;
 
 let rec remove list elem = match list with
@@ -120,7 +120,7 @@ and  setFreeForm (f,l) = match f with
 let setFreeTerm_wrap t = setFreeTerm(t,[]);;
 let setFreeForm_wrap f = setFreeForm(f,[]);;
 
-
+(* must check that sort of s and x are the same *)
 let rec simpleSubTerm (t,s,x) = match t with 
  Variable (a,b,f,p) -> if varEquals( Variable (a,b,f,p), x) && f = true then s else Variable(a,b,f,p)
  | Constant (a,b,p) -> Constant (a,b,p)
@@ -212,11 +212,19 @@ let rec getNames l =  match l with
  |(Constant (a,x,_))::b -> a::getNames b
  |_ -> [];;
 
-let subTerm t x s = let fs = (freeVarTerm (s,[])) in let b = getBoundTerm t in let aux1 = getNames fs in let aux2 = getNames b in
- if intersect aux1 aux2 then t else simpleSubTerm (t,x,s);;
 
-let subForm t x s = let fs = (freeVarTerm (s,[])) in let b = getBoundForm t in let aux1 = getNames fs in let aux2 = getNames b in
- if intersect aux1 aux2 then t else simpleSubForm (t,x,s);;
+let check_subTerm t s   = let fs = (freeVarTerm (s,[])) in let b = getBoundTerm t in let aux1 = getNames fs in let aux2 = getNames b in
+ if intersect aux1 aux2 then false else true;;
+
+let check_subForm t s = let fs = (freeVarTerm (s,[])) in let b = getBoundForm t in let aux1 = getNames fs in let aux2 = getNames b in
+ if intersect aux1 aux2 then false else true;;                 
+
+
+let subTerm t  s x = let fs = (freeVarTerm (s,[])) in let b = getBoundTerm t in let aux1 = getNames fs in let aux2 = getNames b in
+ if intersect aux1 aux2 then t else simpleSubTerm (t,s,x);;
+
+let subForm t  s x = let fs = (freeVarTerm (s,[])) in let b = getBoundForm t in let aux1 = getNames fs in let aux2 = getNames b in
+ if intersect aux1 aux2 then t else simpleSubForm (t,s,x);; 
 
 
 (* List.assoc   calculates sorts on the result of getPairs *)
@@ -298,7 +306,7 @@ let equiv parser l = let v = parenthesis_wrap (binary_op_wrap parser parser ["="
                     |_ -> None) 
  |_ -> None;;
 
-let binaryop parser l = let v = parenthesis_wrap (binary_op_wrap parser parser ["&"; "->";"V";"equiv"]) l in match v with
+let binaryop parser l = let v = parenthesis_wrap (binary_op_wrap parser parser ["&"; "->";"V";"<->"]) l in match v with
   Some (a,b,c) -> (match (a,c) with
                     (Some x, Some z) -> Some (BinaryOp (b,x,z,0))
                     |_ -> None) 
@@ -452,7 +460,4 @@ and formulaEquality f1 f2 k = match f1 with
 
 let termEquality_wrap t1 t2 = termEquality t1 t2 0;;
 let formulaEquality_wrap t1 t2 = formulaEquality t1 t2 0;;
-
-
-
 
