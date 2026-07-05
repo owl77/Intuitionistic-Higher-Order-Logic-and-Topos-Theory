@@ -39,7 +39,8 @@ type term = Variable of string * sort * bool * int | Constant of string * sort *
 (* | TermBinder of string * term * formula * int
  | TermFunction of string * sort * (term list) * int | Lambda of term * term * int *)
 and
-formula = E of term * int | App of term * (term list) * int | BinaryOp of string * formula * formula * int  | UnaryOp of string * formula * int | Equiv of term*term * int |
+formula = E of term * int | App of term * (term list) * int | BinaryOp of string * formula * formula * int  | 
+UnaryOp of string * formula * int | Equiv of term*term * int |
  Binder of string * term * formula * int | PropConstant of string * int;;
  
 (* | Predicate of string * int * (term list) * int | FormBinder of string * term * formula * int | FormulaConstant of string * int | BinaryOp of string * formula * formula * int *) ;;
@@ -66,7 +67,7 @@ let rec getSort t = match t with
  | I (a,b,_) -> getSort a;;
 
 let isFormula f = match f with
- Equiv (a,b,_) -> (getSort a) = (getSort b)
+ Equiv (a,b,_) -> sortEquals( (getSort a), (getSort b))
  |Binder (n,x,a,_) -> (match x with
              Variable (c,d,_,_) -> true
              |_ -> false)
@@ -88,7 +89,7 @@ let rec varMember x l = match l with
 |_-> false;;
 
 
-
+(*
 let rec freeVarTerm (t,l) = match t with
   I (Variable (a,s,f,p),b,_) -> freeVarForm (b, Variable(a,s,f,p)::l)
   | Variable (x,s,f,p) -> if varMember (Variable (x,s,f,p)) l then l else Variable(x,s,f,p)::l 
@@ -101,6 +102,7 @@ and  freeVarForm (f,l) = match f with
   | UnaryOp (n,a,_) -> freeVarForm (a, l)
   | Binder(n,Variable (a,s,b,p),f,_) -> freeVarForm (f, Variable (a,s,b,p)::l) 
   | _ -> l;;
+*)
 
 (* write function that outputs terms and formulas with correct free status on all variables *)
 
@@ -119,6 +121,24 @@ and  setFreeForm (f,l) = match f with
 
 let setFreeTerm_wrap t = setFreeTerm(t,[]);;
 let setFreeForm_wrap f = setFreeForm(f,[]);;
+
+
+let rec pre_freeVarTerm  t  = match t with
+  I (Variable (a,s,f,p),b,_) -> pre_freeVarForm b
+  | Variable (x,s,f,p) -> if f = true then [ Variable (x,s,f,p) ] else []
+  | _ -> []
+and  pre_freeVarForm  f = match f with
+  E (a,_) -> pre_freeVarTerm  a 
+  | Equiv (a,b,_) ->  List.concat [pre_freeVarTerm a ; pre_freeVarTerm  b ]
+  | App (a,c,_) -> let f q = pre_freeVarTerm q  in List.concat ((pre_freeVarTerm a )::(List.map f c))
+  | BinaryOp (n,a,b,_) -> List.concat [pre_freeVarForm a ; pre_freeVarForm b ]
+  | UnaryOp (n,a,_) -> pre_freeVarForm  a 
+  | Binder(n,Variable (a,s,b,p),f,_) -> pre_freeVarForm f
+  | _ -> [];;
+
+let freeVarTerm t = pre_freeVarTerm (setFreeTerm_wrap t);;
+let freeVarForm t = pre_freeVarForm (setFreeForm_wrap t);;
+
 
 (* must check that sort of s and x are the same *)
 let rec simpleSubTerm (t,s,x) = match t with 
@@ -213,18 +233,18 @@ let rec getNames l =  match l with
  |_ -> [];;
 
 
-let check_subTerm t s   = let fs = (freeVarTerm (s,[])) in let b = getBoundTerm t in let aux1 = getNames fs in let aux2 = getNames b in
- if intersect aux1 aux2 then false else true;;
+let check_subTerm t s   = let fs = freeVarTerm s  in let b = getBoundTerm t in let aux1 = getNames fs in let aux2 = getNames b in
+ if intersect aux1 aux2  then false else true;;
 
-let check_subForm t s = let fs = (freeVarTerm (s,[])) in let b = getBoundForm t in let aux1 = getNames fs in let aux2 = getNames b in
- if intersect aux1 aux2 then false else true;;                 
+let check_subForm t s = let fs = freeVarTerm s  in let b = getBoundForm t in let aux1 = getNames fs in let aux2 = getNames b in
+ if intersect aux1 aux2  then false else true;;                 
 
 
-let subTerm t  s x = let fs = (freeVarTerm (s,[])) in let b = getBoundTerm t in let aux1 = getNames fs in let aux2 = getNames b in
- if intersect aux1 aux2 then t else simpleSubTerm (t,s,x);;
+let subTerm t  s x = let fs = freeVarTerm s  in let b = getBoundTerm t in let aux1 = getNames fs in let aux2 = getNames b in
+ if intersect aux1 aux2 && sortEquals(getSort s, getSort x) then t else simpleSubTerm (t,s,x);;
 
-let subForm t  s x = let fs = (freeVarTerm (s,[])) in let b = getBoundForm t in let aux1 = getNames fs in let aux2 = getNames b in
- if intersect aux1 aux2 then t else simpleSubForm (t,s,x);; 
+let subForm t  s x = let fs = freeVarTerm s  in let b = getBoundForm t in let aux1 = getNames fs in let aux2 = getNames b in
+ if intersect aux1 aux2 && sortEquals(getSort s, getSort x) then t else simpleSubForm (t,s,x);; 
 
 
 (* List.assoc   calculates sorts on the result of getPairs *)
@@ -323,7 +343,7 @@ let iota parser1 parser2 l = let v =  operator_wrap (binary_wrap parser1 parser2
 |_-> None;; 
 
 let forall parser1 parser2 l = let v =  operator_wrap (binary_wrap parser1 parser2 ) ["forall"] l in match v with
- Some (Some a, Some b) ->  Some (Binder ("forll", a,b,0))
+ Some (Some a, Some b) ->  Some (Binder ("forall", a,b,0))
 |_-> None;;
 
 let exists parser1 parser2 l = let v =  operator_wrap (binary_wrap parser1 parser2 ) ["exists"] l in match v with

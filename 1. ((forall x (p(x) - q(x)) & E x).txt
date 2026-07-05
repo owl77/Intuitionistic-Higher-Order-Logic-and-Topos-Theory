@@ -1,0 +1,32 @@
+1. ((forall x (p(x) -> q(x)) & E x) & forall x p(x))       addHyp ((forall x (p(x) -> q(x)) & E x) & forall x p(x))
+2. (((forall x (p(x) -> q(x)) & E x) & forall x p(x)) -> forall x p(x))       ax4 (forall x (p(x) -> q(x)) & E x) forall x p(x)
+3. (((forall x (p(x) -> q(x)) & E x) & forall x p(x)) -> (forall x (p(x) -> q(x)) & E x))       ax3 (forall x (p(x) -> q(x)) & E x) forall x p(x)
+4. forall x p(x)       mp 2 1
+5. (forall x (p(x) -> q(x)) & E x)       mp 3 1
+6. ((forall x (p(x) -> q(x)) & E x) -> forall x (p(x) -> q(x)))       ax3 forall x (p(x) -> q(x)) E x
+7. ((forall x (p(x) -> q(x)) & E x) -> E x)       ax4 forall x (p(x) -> q(x)) E x
+8. forall x (p(x) -> q(x))       mp 6 5
+9. E x       mp 7 5
+10. ((forall x (p(x) -> q(x)) & E x) -> (p(x) -> q(x)))       forall (p(x) -> q(x)) x
+11. (p(x) -> q(x))       mp 10 5
+12. (forall x p(x) -> (E x -> (forall x p(x) & E x)))       ax5 forall x p(x) E x
+13. (E x -> (forall x p(x) & E x))       mp 12 4
+14. (forall x p(x) & E x)       mp 13 9
+15. ((forall x p(x) & E x) -> p(x))       forall p(x) x
+16. p(x)       mp 15 14
+17. q(x)       mp 11 16
+18. (((forall x (p(x) -> q(x)) & E x) & forall x p(x)) -> q(x))       deduction 1
+
+
+1. ((p() & q()) -> r())       addHyp ((p() & q()) -> r())
+2. (((p() & q()) -> r()) -> (q() -> ((p() & q()) -> r())))       ax1 ((p() & q()) -> r()) q()
+3. (q() -> ((p() & q()) -> r()))       mp 2 1
+4. ((q() -> ((p() & q()) -> r())) -> ((q() -> (p() & q())) -> (q() -> r())))       ax2 q() (p() & q()) r()
+5. ((q() -> (p() & q())) -> (q() -> r()))       mp 4 3
+6. (((q() -> (p() & q())) -> (q() -> r())) -> (p() -> ((q() -> (p() & q())) -> (q() -> r()))))       ax1 ((q() -> (p() & q())) -> (q() -> r())) p()
+7. (p() -> ((q() -> (p() & q())) -> (q() -> r())))       mp 6 5
+8. ((p() -> ((q() -> (p() & q())) -> (q() -> r()))) -> ((p() -> (q() -> (p() & q()))) -> (p() -> (q() -> r()))))       ax2 p() (q() -> (p() & q())) (q() -> r())
+9. ((p() -> (q() -> (p() & q()))) -> (p() -> (q() -> r())))       mp 8 7
+10. (p() -> (q() -> (p() & q())))       ax5 p() q()
+11. (p() -> (q() -> r()))       mp 9 10
+12. (((p() & q()) -> r()) -> (p() -> (q() -> r())))       deduction 1
