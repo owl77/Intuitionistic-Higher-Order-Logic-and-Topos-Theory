@@ -30,3 +30,17 @@
 10. (p() -> (q() -> (p() & q())))       ax5 p() q()
 11. (p() -> (q() -> r()))       mp 9 10
 12. (((p() & q()) -> r()) -> (p() -> (q() -> r())))       deduction 1
+
+utop # seeProof();;
+1. forall x (((x = y) <-> (x = z)) -> (y = z))       trans x y z
+2. forall x (((x = z) <-> (x = z)) -> (z = z))       sub 1 y z
+3. forall x ((((x = z) -> (x = z)) & ((x = z) -> (x = z))) -> (z = z))       bi 2 1
+4. E z       addHyp E z
+5. (forall x ((((x = z) -> (x = z)) & ((x = z) -> (x = z))) -> (z = z)) & E z)       conj 3 4
+6. ((((x = z) -> (x = z)) & ((x = z) -> (x = z))) -> (z = z))       inst 5
+7. (x = z)       addHyp (x = z)
+8. ((x = z) -> (x = z))       deduction 7
+9. (((x = z) -> (x = z)) & ((x = z) -> (x = z)))       conj 8 8
+10. (z = z)       mp 6 9
+11. (E z -> (z = z))       deduction 4
+- : unit = ()
