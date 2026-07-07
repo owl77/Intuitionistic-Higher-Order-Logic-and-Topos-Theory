@@ -1,44 +1,29 @@
 
-(* axioms and rules of iHOL, Fourman p.1061 *)
+(* axioms and rules of iHOL, Fourman p.1061 - but adapted to natural deduction style
+
+rules:
+
+mp n m (modus ponens)
+deduction n   a |- b   => |- a -> b
+conj n m      a, b    =>  (a & b)
+r n     (a & b)   =>  a
+l n  (a & b) =>  b
+gen n   Ex -> a  => forall x a   (x not free in dependencies of Ex -> a)
+sub n  a  => a [ t /x]
+inst n   forall x a & Et   =>  a[t /x] 
+
+axioms:
+
+ext
+trans
+I
+comp
+pred
+
+addHyp
+ *)
 
 #use "hol.ml";;
-
-let prop1  h s = let phi = formula (lexer h) in let psi = formula (lexer s) in match phi with 
- Some phi_v -> (match psi with
-                          Some psi_v ->  Some (BinaryOp ("->", phi_v, BinaryOp ("->", psi_v, phi_v, 0), 0)) 
-                          |_ -> None)
-|_ -> None;;
-
-
-
-let prop2 h s t = let phi = formula (lexer h) in let psi = formula (lexer s) in let theta = formula (lexer t) in 
- match phi with
- Some phi_v -> (match psi with
-                 Some psi_v -> (match theta with    
-                                  Some theta_v ->Some( BinaryOp ("->", BinaryOp("->",phi_v, BinaryOp("->", psi_v, theta_v,0), 0),
- BinaryOp("->", BinaryOp("->",phi_v,psi_v,0), BinaryOp("->",phi_v, theta_v,0)       ,0)                    ,0)) 
-                    |_ -> None)
-                 |_ -> None)
-|_ -> None;;
-  
- let prop3 h s = let phi = formula (lexer h) in let psi = formula (lexer s) in match phi with
- Some phi_v -> (match psi with
-                          Some psi_v ->  Some (BinaryOp ("->", BinaryOp ("&", phi_v, psi_v, 0), phi_v ,   0))  
-                          |_ -> None)
-|_ -> None;;
-
-
- let prop4 h s = let phi = formula (lexer h) in let psi = formula (lexer s) in match phi with
- Some phi_v -> (match psi with
-                          Some psi_v ->  Some (BinaryOp ("->", BinaryOp ("&", phi_v, psi_v, 0), psi_v,    0))
-                          |_ -> None)
-|_ -> None;;
-
- let prop5 h s = let phi = formula (lexer h) in let psi = formula (lexer s) in match phi with
- Some phi_v -> (match psi with
-                          Some psi_v ->  Some (BinaryOp ("->", phi_v, BinaryOp ("->", psi_v, BinaryOp("&",phi_v,psi_v,0), 0),    0))
-                          |_ -> None)
-|_ -> None;;
 
 type proof_state = Proof of formula list * (formula list) * formula list * ((string list) list);;
 
@@ -48,8 +33,13 @@ let init = Proof ([], [], [], []);;
 
 let current_proof = ref init;;
 
+
+let update_proof form strings = match !current_proof with
+ Proof(a,b,c,d) -> current_proof := Proof (List.append a [form],b,c, List.append d [strings]);;
+
 let rec displayProof a b n  = match (a,b) with 
-                       (x::y, z::w) -> let aux = String.concat " " z in print_endline (String.concat "" [Int.to_string(n); ". "; printFormula x; "       "; aux])  ; displayProof y w (n+1)
+                       (x::y, z::w) -> let aux = String.concat " " z in 
+print_endline (String.concat "" [Int.to_string(n); ". "; printFormula x false false; "       "; aux])  ; displayProof y w (n+1)
                      |_ -> ();;
 
 let seeProof () = match !current_proof with
@@ -58,39 +48,25 @@ let seeProof () = match !current_proof with
 let log() = match !current_proof with
  Proof(a,b,c,d) -> d ;;
 
-let seeHypotheses() = match !current_proof with
- Proof(a,b,c,d) -> d;;
+let seeTheorems() = match !current_proof with
+ Proof(a,b,c,d) -> b;;
+
+let getForms () = match !current_proof with
+ Proof(a,_,_,_) -> a;;
+
+let range n = not (n < 1) && not (n > List.length (getForms () )) ;;
+
+let getForm n = if range n then match !current_proof with
+ Proof(a,_,_,_) -> Some (List.nth a (n-1))  else None;;
+
 
 
 
 let binRule prop f g name  = let aux = prop f g in match aux with
  Some v -> ( match !current_proof with
-                 Proof (a,b,c,d) -> current_proof :=Proof (List.rev (v::(List.rev a))  ,b,c, List.rev ([name; f; g]::
-(List.rev d) )         )  ; true   )
+                 Proof (a,b,c,d) -> current_proof :=Proof (List.append a [v]  ,b,c, List.append d [[name; f; g]])  ; true   )
  |_ -> false;;
 
-let triRule prop f g h name  = let aux = prop f g h in match aux with
- Some v -> ( match !current_proof with
-                 Proof (a,b,c,d) -> current_proof :=Proof (List.rev (v::(List.rev a))  ,b,c, List.rev ([name; f; g; h]::
-(List.rev d) )         )  ; true   )
- |_ -> false;;
-
-
-let ax1 f g = binRule prop1 f g "ax1";;
-let ax2 f g h = triRule prop2 f g h "ax2";;
-let ax3 f g = binRule prop3 f g "ax3";;
-let ax4 f g = binRule prop4 f g "ax4";;
-let ax5 f g = binRule prop5 f g "ax5";;
-
-
-let forall_pre f x = let aux1 = formula (lexer f) in let aux2 = term (lexer x) in match aux1 with
- Some a -> (match aux2 with
-            Some ( Variable (q,w,e,r)) -> Some (BinaryOp("->", BinaryOp("&",  Binder ("forall",
- Variable (q,w,e,r), a,0), E (Variable (q,w,e,r),0),0), a,0   ))
-             |_ -> None )
-|_ -> None;;
-
-let forall f x = binRule forall_pre f x "forall" ;;
 
 
 let pre_ext f x y z = let f1 = formula(lexer f) in let x1 = term (lexer x) in let y1 = term (lexer y) in let z1 = term (lexer z) in
@@ -102,8 +78,8 @@ let aux3 = BinaryOp ("&", aux1, Equiv (y3,z3,0), 0) in Some (BinaryOp ("->",aux3
 
 let ext f x y z = let out = pre_ext f x y z in if not (out = None) then match !current_proof with
  Proof(a,b,c,d) -> (match out with
-                        Some aux -> current_proof:= Proof (List.rev(aux::(List.rev a)),b,c,
-List.rev (["ext"; f; x; y; z]::(List.rev d)  )); true         
+                        Some aux -> current_proof:= Proof (List.append a [aux],b,c,
+List.append d [["ext"; f; x; y; z]]); true         
                       |_ -> false) else false;;
 
 let pre_trans x y z = let x1 = term (lexer x) in let y1 = term (lexer y) in let z1 = term (lexer z) in match x1,y1,z1 with
@@ -169,35 +145,12 @@ let sub n t x = let aux = pre_sub n t x !current_proof in match aux with
  Some a -> current_proof := a; true
 |_ -> false;;
 
-let check_gen form = match form with
- BinaryOp ("->", a, b, _) -> (match a with
-                               BinaryOp("&", c, d, _) -> (match d with 
-                                                           E (Variable (v1,v2,v3,v4), _) -> 
-let f = freeVarForm c in let v = getNames f in not (List.mem v1 v) 
-                                                            |_-> false)
-                              |_ -> false)
-|_-> false;;
-
-let pre_gen n proof = match proof with
-   Proof (p1,p2,p3,p4) -> if n-1 > List.length p1 || n < 0 then None else if check_gen (List.nth p1 (n-1)) then
-                                (match List.nth p1 (n-1) with                                               
-                                 BinaryOp("->", BinaryOp("&", a, E(b,_),_), c,_) -> let aux =  (BinaryOp("->", a, Binder ("forall", b, c, 0),0) ) in 
-Some (Proof (List.rev(aux::(List.rev p1)),p2,p3, List.rev (["gen";Int.to_string(n)]::(List.rev p4)  )))
-                                 |_-> None      
-
-) else None;;
-
-let gen n = let aux = pre_gen n !current_proof in match aux with
- Some a -> current_proof := a; true
-|None -> false;;
 
 let addHyp f = let f1 = formula (lexer f) in match f1, !current_proof with
 Some f2, Proof(a,b,c,d) -> current_proof:= Proof (List.rev(f2::(List.rev a)),b, c, List.rev (["addHyp";f]::(List.rev d)  ))
 ;true 
 | _,_ ->false;;
 
-
-(* write dependency functions to implement a |- b  => |- a -> b *) 
 
 let deduction n = match !current_proof with
  Proof (p1,p2,p3,p4) -> if not (n = List.length p1  -1) && not(n > List.length p1) && 
@@ -210,13 +163,62 @@ let undo () = match !current_proof with
  Proof (a,b,c,d) -> if List.length a > 0 then  (current_proof := Proof (List.take ((List.length a) -1)  a , b , c , List.take ((List.length d) -1) d );true)
 else false;;
 
-
 let rec dependencies n = match !current_proof with
- Proof (_,_,_,a) -> if not (n < 1) && not (n > List.length a) then let aux = List.nth a (n -1) in  match List.nth aux 0 with
- "mp" -> List.concat [ dependencies (int_of_string (List.nth aux 1)) ; dependencies (int_of_string (List.nth aux 2))]
-|"gen" ->  dependencies (int_of_string (List.nth aux 1))
-| "sub"-> dependencies (int_of_string (List.nth aux 1))
-| "addHyp" -> [n]
-|"deduction" -> let d = dependencies (n-1) in let f x = not(x =  int_of_string(List.nth aux 1)) in 
-List.filter f d  
-| _ -> [] else [];; 
+ Proof (_,_,_,a) -> if range n then let aux = List.nth a (n -1) in let prefix = List.nth aux 0 in
+if List.mem prefix ["mp"; "conj"] then 
+ List.concat [ dependencies (int_of_string (List.nth aux 1)) ; dependencies (int_of_string (List.nth aux 2))] else
+if List.mem prefix ["gen"; "sub"; "inst"; "l"; "r";"bi"] then  dependencies (int_of_string (List.nth aux 1)) else
+if prefix = "addHyp" then [n] else if
+prefix = "deduction" then let d = dependencies (n-1) in let f x = not(x =  int_of_string(List.nth aux 1)) in 
+List.filter f d else [] else [];;
+
+
+let rec check_var_dependencies v list = match list with
+x::y -> let aux = getForm x in (match aux with
+Some f -> let aux2 = freeVarForm f in  not (varMember v aux2) && check_var_dependencies v y
+|_ -> false) 
+|_ -> true;;
+
+
+let gen n = if range n then let d = dependencies n in  (match getForm n with
+              Some ( BinaryOp ("->", E (v,p),  a,_)  ) -> if check_var_dependencies v d then let aux = Binder("forall", v, a, 0) in
+                            update_proof aux ["gen"; Int.to_string n]; true else false
+              |_ -> false) 
+ else false;;
+
+
+let inst n = if range n then match getForm n with
+ Some(BinaryOp ("&", Binder ("forall", v, a,_), E (b,_),_ ) ) -> let f = setFreeForm_wrap a in if check_subForm f b && 
+sortEquals (getSort v , getSort b) then   let aux = subForm a b v in update_proof aux ["inst"; Int.to_string n];true
+else false
+|_ -> false
+ else false;; 
+
+let conj n m = if range n && range m then let aux1 = getForm n in let aux2 = getForm m in match aux1,aux2 with
+ Some l, Some r -> let aux3 = BinaryOp("&", l, r, 0) in update_proof aux3 ["conj"; Int.to_string n; Int.to_string m ]; true
+|_ -> false
+else false;;
+
+let l n = if range n then let aux = getForm n in match aux with
+ Some (BinaryOp("&", a, b,_   )) -> update_proof a ["l"; Int.to_string n];true
+|_-> false
+else false;;
+
+let r n = if range n then let aux = getForm n in match aux with
+ Some (BinaryOp("&", a, b,_   )) -> update_proof b ["r" ; Int.to_string n];true
+|_-> false
+else false;;
+
+
+(*missing pred axiom *)
+
+(* expand out <-> *)
+
+let bi_exp f = match f with
+BinaryOp ("<->",a,b,p) -> BinaryOp("&", BinaryOp("->", a,b,p), BinaryOp("->", b, a, p), p)
+|_ -> f;;
+
+let bi n pos = if range n then let aux = getForm n in match aux with
+ Some f -> let aux2 = setOpPosForm_wrap f "<->" in let aux3 = transformF (aux2,bi_exp, pos) in update_proof aux3 ["bi"; Int.to_string n; Int.to_string pos];true
+|_ -> false
+else false;;  

@@ -154,6 +154,22 @@ and simpleSubForm (f,s,x) = match f with
   | Binder (n,Variable (a,w,b,q),f,p) -> if varEquals(Variable(a,w,b,q),x) then Binder (n,Variable(a,w,b,q),f,p)  else Binder (n, Variable(a,w,b,q), simpleSubForm( f,s,x),p)
   | _ -> f;;
 
+let rec transformT (t,fu,pos) = match t with
+ Variable (a,b,f,p) ->  Variable(a,b,f,p)
+ | Constant (a,b,p) ->  Constant (a,b,p)
+ | I (y,f,p) ->  I(y, transformF(f,fu,pos),p)
+and transformF (f,fu, pos) = match f with
+  E (a,p) -> if pos = p then fu (E(a,p)) else E (transformT (a,fu,pos),p)
+  | Equiv (a,b,p) -> if pos = p then fu (Equiv (a,b,p)) else  Equiv (transformT (a,fu,pos), transformT (b,fu,pos),p)
+  | App (a,c,p) -> if pos = p then fu (App(a,c,p)) else let f q = transformT (q,fu,pos) in App (transformT (a,fu,pos), List.map f c , p)
+  | BinaryOp (n,a,b,p) -> if pos = p then fu (BinaryOp(n,a,b,p)) else BinaryOp (n, transformF (a , fu, pos), transformF (b,fu,pos),p)
+  | UnaryOp (n,a,p) -> if pos = p then fu (UnaryOp(n,a,p)) else  UnaryOp(n, transformF (a, fu, pos ),p)
+  | Binder (n,Variable (a,w,b,q),f,p) ->  if pos = p then fu (Binder (n, Variable (a,w,b,q),f, p)) else Binder (n, Variable(a,w,b,q), transformF (f, fu, pos), p)
+  | _ -> f;;
+
+
+
+
 
 let rec getBoundTerm t = match t with
   I (t,b,_) -> t::(getBoundForm b)
@@ -199,6 +215,36 @@ and setPosForm s n = match s with
   | Binder (m,y,f,p) ->  let aux = setPosTerm y n in let aux2 = setPosForm f (snd aux) in
  (Binder(m, fst aux, fst aux2, snd aux2), snd aux2 + 1)
  |PropConstant (m,p) -> (PropConstant (m,n), n+1) ;;
+
+(* to expand out <-> and V or replace a subformula with an equivalent one we need to tag ocurrences *)
+
+let rec setOpPosTerm s n op = match s with
+  Variable (a,b,f,p) -> (Variable(a,b,f,0), 0)
+ | Constant (a,b,p) -> (Constant (a,b,0), 0)
+ | I (y,f,p) ->  let aux = setOpPosTerm y n op in let aux2 = setOpPosForm f (snd aux) op in
+ (I( fst aux, fst aux2, snd aux2), 0)
+and setOpPosForm s n op = match s with
+  E (a,p) -> let aux = setOpPosTerm a n op in  (E (fst aux, 0), 0)
+  | Equiv (a,b,p) ->  let aux = setOpPosTerm a n op in let aux2 = setOpPosTerm b (snd aux) op in
+(Equiv (fst aux, fst aux2, 0),  0)
+  | BinaryOp (m,a,b,p) ->  if m = op then let aux = setOpPosForm a n op in let aux2 = setOpPosForm b (snd aux) op in
+(BinaryOp (m,fst aux, fst aux2, snd aux2 +1), snd aux2 + 1) else let aux = setOpPosForm a n op in let aux2 = setOpPosForm b (snd aux) op in
+(BinaryOp (m,fst aux, fst aux2, 0), 0)
+  | UnaryOp (m,a,p) -> if m = op then let aux = setOpPosForm a n op in  (UnaryOp (m, fst aux, snd aux+1), snd aux +1) else 
+let aux = setOpPosForm a n op in  (UnaryOp (m, fst aux, 0), 0)
+  | App (a,c,p) -> let aux = setOpPosTerm a n op in let pass l  m = setOpPosTerm l m op in let aux2 = monad c pass (snd aux) in
+(App (fst aux, fst aux2, 0 ), 0)
+  | Binder (m,y,f,p) ->  let aux = setOpPosTerm y n op in let aux2 = setOpPosForm f (snd aux) op in
+ (Binder(m, fst aux, fst aux2, 0), 0)
+ |PropConstant (m,p) -> if m = op then (PropConstant (m,n+1), n+1) else (PropConstant (m,0), 0);;
+
+
+let setOpPosTerm_wrap s op = let aux = setOpPosTerm s 0 op in match aux with
+(f,n) -> f;;
+let setOpPosForm_wrap s op = let aux = setOpPosForm  s 0 op in match aux with
+(f,n) -> f;;
+
+
 
      
 let vars = ref [];;
@@ -387,24 +433,32 @@ let rec sort l = orParse [ basesort ; relsort sort] l;;
 
 (* display expressions *)
 
-let rec printTerm t = match t with
- Variable (a,b,f,p) -> a
- | Constant (a,b,p) -> a
- | I (y,f,p) -> String.concat "" ["I "; printTerm y ; " "; (printFormula f)]
-and printFormula f = match f with
-  E (a,p) -> String.concat "" ["E "; (printTerm a)]
-  | Equiv (a,b,p) -> String.concat "" ["("; printTerm a; " = " ; printTerm b; ")"]
-  | App (a,c,p) -> let f q = printTerm q in let aux =  (String.concat "," (List.map f c) ) in 
-String.concat "" [printTerm a; "("; aux ; ")"]  
-  | BinaryOp (n,a,b,p) -> String.concat "" ["("; printFormula a; " ";n;" ";   printFormula b; ")"]
-  | UnaryOp (n,a,p) -> String.concat "" [n; "("; printFormula a; ")"]
-  | Binder (n, Variable (a,w,b,q),f,p) -> String.concat "" [n ;" "; a ;" ";  (printFormula f)]
-  |PropConstant (n,p) -> n
-  | _ -> "";;
-
 let rec printSort s = match s with
  BaseSort a -> a
 |RelSort l -> let f x = printSort x in let aux = String.concat ","  (List.map f l) in String.concat "" ["["; aux ; "]"];;
+
+let rec printTerm t typ pos  = match t with
+ Variable (a,b,f,p) -> a
+ | Constant (a,b,p) -> a
+ | I (y, f,p) -> if typ then  String.concat "" ["I "; printTerm y typ pos ; ":"; printSort  (getSort y); "."; (printFormula f typ pos)]
+else String.concat "" ["I "; printTerm y typ pos;  " "; (printFormula f typ pos)]
+
+and printFormula f typ pos  = match f with
+  E (a,p) -> String.concat "" ["E "; (printTerm a typ pos)]
+  | Equiv (a,b,p) -> String.concat "" ["("; printTerm a typ pos; " = " ; printTerm b typ pos; ")"]
+  | App (a,c,p) -> let f q = printTerm q typ pos in let aux =  (String.concat "," (List.map f c) ) in 
+String.concat "" [printTerm a typ pos; "("; aux ; ")"]  
+  | BinaryOp (n,a,b,p) -> if pos then String.concat "" ["("; printFormula a typ pos; " ";n;"{"; Int.to_string p;"}";  " ";   printFormula b typ pos; ")" ]
+else String.concat "" ["("; printFormula a typ pos;   " ";n;" ";  printFormula b typ pos; ")" ]
+
+  | UnaryOp (n,a,p) -> if pos then  String.concat "" [n;"{"; Int.to_string p;"}"  ; "("; printFormula a typ pos; ")"] else
+ String.concat "" [n; "("; printFormula a typ pos; ")"]
+
+  | Binder (n, Variable (a,w,b,q),f,p) -> if typ then String.concat "" [n ;" "; a ;":"; printSort w; ".";  (printFormula f typ pos)]
+else String.concat "" [n ;" "; a ;" ";  (printFormula f typ pos)]
+  |PropConstant (n,p) -> if not pos then n else String.concat "" [n;"{";Int.to_string p; "}"]
+  | _ -> "";;
+
 
 (* add constants, variables and sorts *)
 
@@ -419,12 +473,12 @@ let newConstant name s = let aux = sort (lexer s) in if not (List.mem name (getN
 |_ -> ();;
 
 
-let displayTerm x = match x with
-                    |Some a -> printTerm a
+let displayTerm x typ pos  = match x with
+                    |Some a -> printTerm a typ pos
                     |_ -> "";;
 
-let displayFormula x = match x with
-                    |Some a -> printFormula a
+let displayFormula typ pos x = match x with
+                    |Some a -> printFormula a typ pos
                     |_ -> "";;
 
 (*equality of formulas and terms must involve renaming bound variables *)
@@ -481,3 +535,8 @@ and formulaEquality f1 f2 k = match f1 with
 let termEquality_wrap t1 t2 = termEquality t1 t2 0;;
 let formulaEquality_wrap t1 t2 = formulaEquality t1 t2 0;;
 
+(* test functions *)
+
+let f e = let aux = formula (lexer e) in match aux with
+Some x -> x
+|_ -> PropConstant("failed",0);;
