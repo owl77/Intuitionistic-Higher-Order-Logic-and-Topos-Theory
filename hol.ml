@@ -216,8 +216,9 @@ and setPosForm s n = match s with
  (Binder(m, fst aux, fst aux2, snd aux2), snd aux2 + 1)
  |PropConstant (m,p) -> (PropConstant (m,n), n+1) ;;
 
-(* to expand out <-> and V or replace a subformula with an equivalent one we need to tag ocurrences *)
 
+(* this function is not needed! *)
+(*
 let rec setOpPosTerm s n op = match s with
   Variable (a,b,f,p) -> (Variable(a,b,f,0), 0)
  | Constant (a,b,p) -> (Constant (a,b,0), 0)
@@ -238,10 +239,11 @@ let aux = setOpPosForm a n op in  (UnaryOp (m, fst aux, 0), 0)
  (Binder(m, fst aux, fst aux2, 0), 0)
  |PropConstant (m,p) -> if m = op then (PropConstant (m,n+1), n+1) else (PropConstant (m,0), 0);;
 
+*)
 
-let setOpPosTerm_wrap s op = let aux = setOpPosTerm s 0 op in match aux with
+let setPosTerm_wrap s = let aux = setPosTerm s 1  in match aux with
 (f,n) -> f;;
-let setOpPosForm_wrap s op = let aux = setOpPosForm  s 0 op in match aux with
+let setPosForm_wrap s  = let aux = setPosForm  s 1  in match aux with
 (f,n) -> f;;
 
 
@@ -439,15 +441,19 @@ let rec printSort s = match s with
 
 let rec printTerm t typ pos  = match t with
  Variable (a,b,f,p) -> a
- | Constant (a,b,p) -> a
+ | Constant (a,b,p) ->  if not pos then a else String.concat "" ["{"; Int.to_string p; "}"]
  | I (y, f,p) -> if typ then  String.concat "" ["I "; printTerm y typ pos ; ":"; printSort  (getSort y); "."; (printFormula f typ pos)]
 else String.concat "" ["I "; printTerm y typ pos;  " "; (printFormula f typ pos)]
 
 and printFormula f typ pos  = match f with
   E (a,p) -> String.concat "" ["E "; (printTerm a typ pos)]
-  | Equiv (a,b,p) -> String.concat "" ["("; printTerm a typ pos; " = " ; printTerm b typ pos; ")"]
-  | App (a,c,p) -> let f q = printTerm q typ pos in let aux =  (String.concat "," (List.map f c) ) in 
-String.concat "" [printTerm a typ pos; "("; aux ; ")"]  
+  | Equiv (a,b,p) -> if not pos then String.concat "" ["("; printTerm a typ pos; " = " ; printTerm b typ pos; ")"]
+else String.concat "" ["("; printTerm a typ pos; " = ";"{"; Int.to_string p; "}" ; printTerm b typ pos; ")"]
+
+  | App (a,c,p) -> if not pos then let f q = printTerm q typ pos in let aux =  (String.concat "," (List.map f c) ) in 
+String.concat "" [printTerm a typ pos; "("; aux ; ")"] else let f q = printTerm q typ pos in 
+let aux =  (String.concat "," (List.map f c) ) in
+String.concat "" [printTerm a typ pos;"{"; Int.to_string p; "}"; "("; aux ; ")"] 
   | BinaryOp (n,a,b,p) -> if pos then String.concat "" ["("; printFormula a typ pos; " ";n;"{"; Int.to_string p;"}";  " ";   printFormula b typ pos; ")" ]
 else String.concat "" ["("; printFormula a typ pos;   " ";n;" ";  printFormula b typ pos; ")" ]
 
@@ -455,7 +461,8 @@ else String.concat "" ["("; printFormula a typ pos;   " ";n;" ";  printFormula b
  String.concat "" [n; "("; printFormula a typ pos; ")"]
 
   | Binder (n, Variable (a,w,b,q),f,p) -> if typ then String.concat "" [n ;" "; a ;":"; printSort w; ".";  (printFormula f typ pos)]
-else String.concat "" [n ;" "; a ;" ";  (printFormula f typ pos)]
+else if not pos then String.concat "" [n ;" "; a ;" ";  (printFormula f typ pos)] else
+String.concat "" [n ;"{"; Int.to_string p; "} "; a ;" ";  (printFormula f typ pos)]
   |PropConstant (n,p) -> if not pos then n else String.concat "" [n;"{";Int.to_string p; "}"]
   | _ -> "";;
 

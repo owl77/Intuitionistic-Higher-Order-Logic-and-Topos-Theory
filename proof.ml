@@ -16,11 +16,14 @@ axioms:
 
 ext
 trans
-I
+i
 comp
 pred
 
 addHyp
+bi
+equiv_sub
+useTheorem
  *)
 
 #use "hol.ml";;
@@ -45,11 +48,18 @@ print_endline (String.concat "" [Int.to_string(n); ". "; printFormula x false fa
 let seeProof () = match !current_proof with
  Proof(a,b,c,d) -> displayProof a d 1 ;;
 
+let rec pre_displayTheorems a n = match a with
+  x:: y -> print_endline (String.concat "" [Int.to_string(n);". "; printFormula x false false]); pre_displayTheorems y (n+1)
+ |_ -> ();;
+
+let seeTheorems () = match !current_proof with
+ Proof (a,b,c,d) -> pre_displayTheorems b 1;;
+
 let log() = match !current_proof with
  Proof(a,b,c,d) -> d ;;
 
-let seeTheorems() = match !current_proof with
- Proof(a,b,c,d) -> b;;
+(*let seeTheorems() = match !current_proof with
+ Proof(a,b,c,d) -> b;;*)
 
 let getForms () = match !current_proof with
  Proof(a,_,_,_) -> a;;
@@ -60,13 +70,10 @@ let getForm n = if range n then match !current_proof with
  Proof(a,_,_,_) -> Some (List.nth a (n-1))  else None;;
 
 
-
-
 let binRule prop f g name  = let aux = prop f g in match aux with
  Some v -> ( match !current_proof with
                  Proof (a,b,c,d) -> current_proof :=Proof (List.append a [v]  ,b,c, List.append d [[name; f; g]])  ; true   )
  |_ -> false;;
-
 
 
 let pre_ext f x y z = let f1 = formula(lexer f) in let x1 = term (lexer x) in let y1 = term (lexer y) in let z1 = term (lexer z) in
@@ -94,25 +101,38 @@ let trans x y z = let aux = pre_trans x y z in match !current_proof, aux with
  Proof(a,b,c,d), Some e -> current_proof := Proof (List.append a [e], b, c, List.append d [["trans"; x; y; z  ]]);true 
 |_, _ -> false;;
 
-
 let pre_I f x y = let f1 = formula(lexer f) in let x1 = term (lexer x) in let y1 = term (lexer y) in match f1,x1,y1 with
- Some f2, Some(Variable(a,b,c,d)), Some(Variable (a1,b1,c1,d1)) -> if sortEquals(b,b1) then let left = Equiv(Variable(a1,b1,c1,d1), I (Variable(a,b,c,d), f2,0),0) in let
-right = Binder ("forall", Variable(a,b,c,d), BinaryOp ("<->", f2, Equiv (Variable(a,b,c,d), Variable(a1,b1,c1,d1),0), 0) ,0) in
-Some (Binder ("forall",Variable (a1,b1,c1,d1), BinaryOp ("<->", left, right, 0),0)) else None
+  Some f2, Some(Variable(a,b,c,d)), Some(Variable (a1,b1,c1,d1)) -> if sortEquals(b,b1) then 
+let left = Equiv(Variable(a1,b1,c1,d1), I (Variable(a,b,c,d), f2,0),0) in let
+right = Binder ("forall", Variable(a,b,c,d), BinaryOp ("<->", f2, Equiv (Variable(a,b,c,d), Variable(a1,b1,c1,d1),0), 0) ,0)
+ in Some (Binder ("forall",Variable (a1,b1,c1,d1), BinaryOp ("<->", left, right, 0),0)) else None
 |_,_,_ -> None;;
 
 
-let i f x y = let aux = pre_trans f x y in match !current_proof, aux with
+let i f x y = let aux = pre_I f x y in match !current_proof, aux with
  Proof(a,b,c,d), Some e -> current_proof := Proof (List.append a [e], b, c, List.append d [["i";f;  x; y;  ]]);true
 |_, _ -> false;;
 
-let pre_comp_0 f y = let f1 = formula (lexer f)  in let y1 = term (lexer y) in match f1,y1 with
-Some f2, Some(Variable(a1,b1,c1,d1)) -> if sortEquals(b1, RelSort []) then
-Some ( E ( I( Variable(a1,b1,c1,d1), BinaryOp("<->", f2, App (Variable(a1,b1,c1,d1),[],0)         ,0 ),0 ),0 )  ) else None 
+let rec iter_forall var_list f = match var_list with
+ (Variable (a,b,q,w)):: x -> Binder ("forall", Variable(a,b,q,w), iter_forall x f,0)
+|_ -> f;;
+
+let rec iter_and f_list = match f_list with
+ y::[] -> y
+| y :: x ->  BinaryOp("&", y, iter_and x,0)
+|_ -> PropConstant ("fail",0);;
+
+
+let pre_comp f v args = let f1 = formula (lexer f) in let v1 = term (lexer v)  in 
+let args1 = List.map  (function t -> (match  term (lexer t) with Some u -> u | None -> Constant ("fail",RelSort [],0))) args 
+  in let sorts = List.map (function t -> getSort t) args1 in
+ match f1,v1 with
+  Some f2, Some Variable(a1,a2,a3,a4) -> if sortEquals(a2, RelSort sorts) then
+  Some ( E ( I( Variable(a1,a2,a3,a4),iter_forall args1 (BinaryOp("<->",f2, App (Variable(a1,a2,a3,a4),args1,0) ,0 )) ,0 ),0 )) else None 
 |_,_ -> None;;
 
-let comp_0 f y = let aux = pre_comp_0 f y in match !current_proof, aux with
- Proof(a,b,c,d), Some e -> current_proof := Proof (List.append a [e], b, c, List.append d [["comp_0"; f; y ]]);true
+let comp f y args = let aux = pre_comp f y args in match !current_proof, aux with
+ Proof(a,b,c,d), Some e -> current_proof := Proof (List.append a [e], b, c, List.append d [["comp"; f; y] @ args]   );true
 |_, _ -> false;;
 
 (* can do general comp with an argument list of strings *)
@@ -127,7 +147,6 @@ List.rev (["mp"; Int.to_string(n); Int.to_string(m)]::(List.rev d)  )))
 let mp n m = let aux = modus_ponens n m !current_proof in match aux with
  Some a -> current_proof := a;true
 |_ -> false;;
-
 
 let pre_sub n t x proof =  let v = term (lexer x) in let s = term (lexer t) in match v with
  Some Variable (u1,u2,u3,u4) -> (match s with 
@@ -165,7 +184,7 @@ else false;;
 
 let rec dependencies n = match !current_proof with
  Proof (_,_,_,a) -> if range n then let aux = List.nth a (n -1) in let prefix = List.nth aux 0 in
-if List.mem prefix ["mp"; "conj"] then 
+if List.mem prefix ["mp"; "conj";"sub_equiv"] then 
  List.concat [ dependencies (int_of_string (List.nth aux 1)) ; dependencies (int_of_string (List.nth aux 2))] else
 if List.mem prefix ["gen"; "sub"; "inst"; "l"; "r";"bi"] then  dependencies (int_of_string (List.nth aux 1)) else
 if prefix = "addHyp" then [n] else if
@@ -186,10 +205,9 @@ let gen n = if range n then let d = dependencies n in  (match getForm n with
               |_ -> false) 
  else false;;
 
-
 let inst n = if range n then match getForm n with
  Some(BinaryOp ("&", Binder ("forall", v, a,_), E (b,_),_ ) ) -> let f = setFreeForm_wrap a in if check_subForm f b && 
-sortEquals (getSort v , getSort b) then   let aux = subForm a b v in update_proof aux ["inst"; Int.to_string n];true
+sortEquals (getSort v , getSort b) then   let aux = subForm f b v in update_proof aux ["inst"; Int.to_string n];true
 else false
 |_ -> false
  else false;; 
@@ -209,16 +227,52 @@ let r n = if range n then let aux = getForm n in match aux with
 |_-> false
 else false;;
 
-
 (*missing pred axiom *)
 
 (* expand out <-> *)
 
+let showPositions n = if range n then let aux = getForm n in match aux with
+ Some f -> let g = setPosForm_wrap f in print_endline (printFormula g false true);true
+|_ -> false
+else false;;
+
+exception Matching_Error of string;;
+
 let bi_exp f = match f with
 BinaryOp ("<->",a,b,p) -> BinaryOp("&", BinaryOp("->", a,b,p), BinaryOp("->", b, a, p), p)
-|_ -> f;;
+|_ -> raise (Matching_Error "Principle connective not <->");;
 
 let bi n pos = if range n then let aux = getForm n in match aux with
- Some f -> let aux2 = setOpPosForm_wrap f "<->" in let aux3 = transformF (aux2,bi_exp, pos) in update_proof aux3 ["bi"; Int.to_string n; Int.to_string pos];true
+ Some f -> let aux2 = setPosForm_wrap f in 
+let aux3 = transformF (aux2,bi_exp, pos) in update_proof aux3 ["bi"; Int.to_string n; Int.to_string pos];true
 |_ -> false
 else false;;  
+
+(* sub_equiv n m pos     n is the number of a <-> b, substitutes in formula n the
+ occurrence of a in position pos for b *)
+
+let check_equiv n = if range n then let aux = getForm n in match aux with
+ Some f ->(match f with 
+                  BinaryOp("<->", a,b, p) -> true
+                 |_ -> false
+)
+|_ -> false
+else false;;
+
+let sub_equiv_fu left right p = if formulaEquality_wrap p left then right else raise (Matching_Error "expression is not equal to left side of equivalence");;
+ 
+let sub_equiv n m pos = if range n && check_equiv m then let prin = getForm n in let e = getForm m in match prin, e with
+ Some pr, Some (BinaryOp ("<->", left, right, p)) ->   let aux1 = setPosForm_wrap pr in
+let aux2 = transformF (aux1,sub_equiv_fu left right, pos) in update_proof aux2 ["bi"; Int.to_string n; Int.to_string m];true
+
+|_,_ -> false
+else false ;;
+
+let addTheorem f = let aux = formula (lexer f) in match !current_proof, aux with
+ Proof (a,b,c,d), Some e -> current_proof:= Proof(a, List.append b [e], c, d);true 
+| _,_ -> false;;
+
+let useTheorem n = match !current_proof with
+ Proof (a,b,c,d) -> if n < 1 || n >List.length b then false else let aux = List.nth b (n-1) in current_proof:= Proof (List.append a [aux],b,c,List.append d
+[["useTheorem"; Int.to_string n]]); true;;
+
