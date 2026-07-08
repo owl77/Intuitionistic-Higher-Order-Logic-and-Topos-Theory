@@ -7,5 +7,5 @@ The next file proof.ml is an implementation of a basic proof assistant for intui
 
 Our first goal is to prove all the logical lemmas in Fourman's paper (Theorem 3.5, Lemma 3.6, Lemma 3.10 ).
 
-In the preliminary version the proof assistant can be run from utop. A proofs can be written interactively (#use "proof.ml") or written as a script such as in
+The preliminary version the proof assistant can be run from utop. Proofs can be written interactively (#use "proof.ml") or written as a script such as in
 the example included  #use "env.ml". 
