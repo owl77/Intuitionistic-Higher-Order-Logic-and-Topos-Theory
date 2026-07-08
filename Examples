@@ -44,3 +44,29 @@ utop # seeProof();;
 10. (z = z)       mp 6 9
 11. (E z -> (z = z))       deduction 4
 - : unit = ()
+
+Running #use "env.ml" 
+
+1. forall y y()       addHyp forall y y()
+2. E I y (p() <-> y())       comp p() y
+3. (forall y y() & E I y (p() <-> y()))       conj 1 2
+4. I y (p() <-> y())()       inst 3
+5. forall z ((z = I y (p() <-> y())) <-> forall y ((p() <-> y()) <-> (y = z)))       i (p() <-> y()) y z
+6. (forall z ((z = I y (p() <-> y())) <-> forall y ((p() <-> y()) <-> (y = z))) & E I y (p() <-> y()))       conj 5 2
+7. ((I y (p() <-> y()) = I y (p() <-> y())) <-> forall y ((p() <-> y()) <-> (y = I y (p() <-> y()))))       inst 6
+8. (((I y (p() <-> y()) = I y (p() <-> y())) -> forall y ((p() <-> y()) <-> (y = I y (p() <-> y())))) & (forall y ((p() <-> y()) <-> (y = I y (p() <-> y()))) -> (I y (p() <-> y()) = I y (p() <-> y()))))       bi 7 33
+9. ((I y (p() <-> y()) = I y (p() <-> y())) -> forall y ((p() <-> y()) <-> (y = I y (p() <-> y()))))       l 8
+10. (E q -> (q = q))       useTheorem 1
+11. (E I y (p() <-> y()) -> (I y (p() <-> y()) = I y (p() <-> y())))       sub 10 q I y (p() <-> y())
+12. (I y (p() <-> y()) = I y (p() <-> y()))       mp 11 2
+13. forall y ((p() <-> y()) <-> (y = I y (p() <-> y())))       mp 9 12
+14. (forall y ((p() <-> y()) <-> (y = I y (p() <-> y()))) & E I y (p() <-> y()))       conj 13 2
+15. ((p() <-> I y (p() <-> y())()) <-> (I y (p() <-> y()) = I y (p() <-> y())))       inst 14
+16. (((p() <-> I y (p() <-> y())()) -> (I y (p() <-> y()) = I y (p() <-> y()))) & ((I y (p() <-> y()) = I y (p() <-> y())) -> (p() <-> I y (p() <-> y())())))       bi 15 27
+17. ((I y (p() <-> y()) = I y (p() <-> y())) -> (p() <-> I y (p() <-> y())()))       r 16
+18. (p() <-> I y (p() <-> y())())       mp 17 12
+19. ((p() -> I y (p() <-> y())()) & (I y (p() <-> y())() -> p()))       bi 18 11
+20. (I y (p() <-> y())() -> p())       r 19
+21. p()       mp 20 4
+22. (forall y y() -> p())       deduction 1
+
