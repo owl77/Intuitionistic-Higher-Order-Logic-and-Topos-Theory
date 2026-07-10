@@ -122,6 +122,11 @@ let rec iter_and f_list = match f_list with
 | y :: x ->  BinaryOp("&", y, iter_and x,0)
 |_ -> PropConstant ("fail",0);;
 
+let rec put_E t_list = match t_list with
+ y::[] -> E(y,0)
+| y:: x-> BinaryOp("&", E(y,0), put_E x,0)
+|_ -> PropConstant ("fail",0);;
+
 
 let pre_comp f v args = let f1 = formula (lexer f) in let v1 = term (lexer v)  in 
 let args1 = List.map  (function t -> (match  term (lexer t) with Some u -> u | None -> Constant ("fail",RelSort [],0))) args 
@@ -227,7 +232,19 @@ let r n = if range n then let aux = getForm n in match aux with
 |_-> false
 else false;;
 
-(*missing pred axiom *)
+let pre_pred y xlist =  let y1 = term (lexer y) in let  args1 = 
+List.map  (function t -> (match  term (lexer t) with Some u -> u | None -> Constant ("fail",RelSort [],0))) xlist
+  in let sorts = List.map (function t -> getSort t) args1 in
+ match y1 with
+  Some y2 -> if sortEquals(getSort y2, RelSort sorts) then
+  if List.length args1 > 0 then Some (BinaryOp("->", App(y2, args1,0),  BinaryOp("&", E(y2,0), put_E args1,0)  ,0)) else
+ Some(BinaryOp("->", App(y2, args1,0), E(y2,0),0)) else None
+|_ -> None;;
+
+let pred y args = let aux = pre_pred y args in match !current_proof, aux with
+ Proof(a,b,c,d), Some e -> current_proof := Proof (List.append a [e], b, c, List.append d [["pred"; y] @ args]   );true
+|_, _ -> false;;
+
 
 (* expand out <-> *)
 

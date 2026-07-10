@@ -488,6 +488,14 @@ let displayFormula typ pos x = match x with
                     |Some a -> printFormula a typ pos
                     |_ -> "";;
 
+(* display environment *)
+
+let seeEnv () = print_string   "Variables:   "; let aux = List.map (function x -> String.concat "" [printTerm x true false;":";  printSort(getSort x); "  "]   ) !vars in print_endline (String.concat "" aux);
+print_newline();print_string  "Constants:    "; let aux2 = List.map (function x -> printTerm x true false) !constants in print_endline (String.concat " " aux2);
+print_newline(); print_string  "Propositional Constants:   "; let aux3 = List.map (function x -> printFormula x true false) !propconstants  in 
+print_endline (String.concat " " aux3);;
+
+
 (*equality of formulas and terms must involve renaming bound variables *)
 
 
