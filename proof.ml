@@ -160,7 +160,7 @@ let pre_sub n t x proof =  let v = term (lexer x) in let s = term (lexer t) in m
       let f = setFreeForm_wrap(List.nth a (n-1)) in if check_subForm f i then 
                                  let aux = subForm f i (Variable (u1,u2,u3,u4)) in     
                           Some (Proof (List.rev(aux::(List.rev a)),b,c,
-List.rev (["sub";Int.to_string(n);x;t]::(List.rev d)  ))) else None  )
+List.rev (["sub";Int.to_string(n);t;x]::(List.rev d)  ))) else None  )
                        |_ -> None)
 |_-> None;;
 
@@ -177,8 +177,8 @@ Some f2, Proof(a,b,c,d) -> current_proof:= Proof (List.rev(f2::(List.rev a)),b, 
 
 
 let deduction n = match !current_proof with
- Proof (p1,p2,p3,p4) -> if not (n = List.length p1  -1) && not(n > List.length p1) && 
-List.nth (List.nth p4 (n-1)) 0  = "addHyp" then
+ Proof (p1,p2,p3,p4) -> if  range n  &&  List.nth (List.nth p4 (n-1)) 0  = "addHyp" 
+then
 let aux =  List.nth p1 (n-1) in let aux2 = BinaryOp ("->", aux, List.nth p1 ((List.length p1) - 1) , 0) in
  current_proof := Proof(List.append p1 [aux2], p2, p3, List.append p4 [["deduction"; Int.to_string(n)]]); true
  else false;;
@@ -191,7 +191,7 @@ let rec dependencies n = match !current_proof with
  Proof (_,_,_,a) -> if range n then let aux = List.nth a (n -1) in let prefix = List.nth aux 0 in
 if List.mem prefix ["mp"; "conj";"sub_equiv"] then 
  List.concat [ dependencies (int_of_string (List.nth aux 1)) ; dependencies (int_of_string (List.nth aux 2))] else
-if List.mem prefix ["gen"; "sub"; "inst"; "l"; "r";"bi"] then  dependencies (int_of_string (List.nth aux 1)) else
+if List.mem prefix ["gen"; "sub"; "inst"; "l"; "r";"bi"; "make_equiv" ; ] then  dependencies (int_of_string (List.nth aux 1)) else
 if prefix = "addHyp" then [n] else if
 prefix = "deduction" then let d = dependencies (n-1) in let f x = not(x =  int_of_string(List.nth aux 1)) in 
 List.filter f d else [] else [];;
@@ -280,7 +280,7 @@ let sub_equiv_fu left right p = if formulaEquality_wrap p left then right else r
  
 let sub_equiv n m pos = if range n && check_equiv m then let prin = getForm n in let e = getForm m in match prin, e with
  Some pr, Some (BinaryOp ("<->", left, right, p)) ->   let aux1 = setPosForm_wrap pr in
-let aux2 = transformF (aux1,sub_equiv_fu left right, pos) in update_proof aux2 ["bi"; Int.to_string n; Int.to_string m];true
+let aux2 = transformF (aux1,sub_equiv_fu left right, pos) in update_proof aux2 ["sub_equiv"; Int.to_string n; Int.to_string m; Int.to_string pos];true
 
 |_,_ -> false
 else false ;;
@@ -293,3 +293,21 @@ let useTheorem n = match !current_proof with
  Proof (a,b,c,d) -> if n < 1 || n >List.length b then false else let aux = List.nth b (n-1) in current_proof:= Proof (List.append a [aux],b,c,List.append d
 [["useTheorem"; Int.to_string n]]); true;;
 
+(* missing creation of equivalences *)
+
+let pre_make_equiv n = if range n then let aux = getForm n in match aux with
+Some f -> (match f with
+BinaryOp("&", BinaryOp("->", a,b,p), BinaryOp("->", b1, a1,q), r) -> if (formulaEquality_wrap a a1  && formulaEquality_wrap b b1) then  Some (BinaryOp("<->", a,b,0) ) else None
+|_ -> None)
+|_ -> None
+else None;;
+
+let make_equiv n = let aux = pre_make_equiv n in match aux with
+Some a -> update_proof a ["make_equiv"; Int.to_string n]; true
+
+|_ -> false;;
+
+
+(* shortcut *)
+
+let p () = seeProof ();;
